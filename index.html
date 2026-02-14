@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Наш Ремонт Любви ❤️</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="container">
+    <header>
+        <h1>С Днем Святого Валентина! ❤️</h1>
+        <p>Ты думала, что ты в праздник можешь избежать ремонта? За работу!</p>
+    </header>
+
+    <div class="stage-card active" id="stage1">
+        <h3>Выкидываем хлам</h3>
+        <p class="instruction">Выброси хлам в бак, чтобы найти наши фото!</p>
+        <div class="game-area" id="area1">
+            <img src="img/trash-bin.png" id="trash-bin" class="target" style="width: 280px; bottom: 10px; right: 10px;">
+            <img src="img/history1.jpg" class="history-photo" id="hist1" style="top: 80px; left: 60px; transform: rotate(-8deg);">
+            <img src="img/history2.jpg" class="history-photo" id="hist2" style="top: 120px; left: 320px; transform: rotate(10deg);">
+            <img src="img/history3.jpg" class="history-photo" id="hist3" style="top: 380px; left: 100px; transform: rotate(-5deg);">
+            <img src="img/history4.jpg" class="history-photo" id="hist4" style="top: 420px; left: 350px; transform: rotate(7deg);">
+            <img src="img/плитка.png" class="draggable furniture" style="top: 30px; left: 30px; width: 160px;">
+            <img src="img/box.png" class="draggable furniture" style="top: 30px; left: 380px; width: 190px;">
+            <img src="img/chair.png" class="draggable furniture" style="top: 300px; left: 40px; width: 140px;">
+            <img src="img/table.png" class="draggable furniture" style="top: 480px; left: 60px; width: 170px;">
+        </div>
+        <button class="btn" id="btn1" onclick="nextStage(2)">Всё чисто! К демонтажу?</button>
+    </div>
+
+    <div class="stage-card" id="stage2">
+        <h3>Счищаем краску</h3>
+        <p class="instruction">Сотри старую отделку болгаркой!</p>
+        <div class="photo-container" id="area2">
+            <img src="img/wall_clean.jpg" class="real-photo">
+            <canvas id="canvas2"></canvas>
+            <img src="img/history5.jpg" class="history-photo-big" id="hist5">
+            <img src="img/grinder.png" id="grinder-tool" class="tool" style="width: 250px;">
+        </div>
+        <button class="btn" id="btn2" onclick="nextStage(3)">Стены готовы!</button>
+    </div>
+
+    <div class="stage-card" id="stage3">
+        <h3>Штукатурим стеночки</h3>
+        <p class="instruction">Зашпаклюй стену полностью!</p>
+        <div class="photo-container" id="area3">
+            <img src="img/wall_clean3.jpg" class="real-photo">
+            <canvas id="canvas3"></canvas>
+            <img src="img/history6.jpg" class="history-photo-big" id="hist6">
+            <img src="img/spatula.png" id="spatula-tool" class="tool" style="width: 200px;">
+        </div>
+        <button class="btn" id="btn3" onclick="nextStage(4)">Почти готово!</button>
+    </div>
+
+    <div class="stage-card" id="stage4">
+        <h3>Молочко</h3>
+        <p class="instruction" id="milk-text">Ого, ты хорошо постаралась! Но... ты как всегда свинюшка) Сотри эти усы!</p>
+        <div class="photo-container" id="area4" style="cursor: crosshair;">
+            <img src="img/sigma.jpg" class="real-photo">
+            <canvas id="canvas4"></canvas>
+            <div id="kiss-text" style="display:none; position:absolute; bottom:20px; width:100%; color:white; z-index:10; font-weight:bold; text-shadow: 2px 2px 5px black; font-size: 1.4em;">
+                А теперь поцелуй такого красавца! ❤️
+            </div>
+        </div>
+        <button class="btn" id="btn4" onclick="showFinal()">ПОЛУЧИТЬ СЮРПРИЗ</button>
+    </div>
+
+    <div class="stage-card" id="final">
+        <h2>Ты моя звездочка ❤️</h2>
+        <img src="img/final.jpg" class="final-img">
+    </div>
+</div>
+
+<div id="wish-modal" class="modal">
+    <div class="modal-content">
+        <h2>Пипа! ❤️</h2>
+        <p>Я рад, что мы с тобой вместе, мне с тобой тепло и комфортно.</p>
+        <p>Люблю тебя, цветочек. С праздничком</p>
+        <button class="btn" style="display:inline-block" onclick="closeModal()">Я тебя тоже!</button>
+    </div>
+</div>
+
+<script src="script.js"></script>
+</body>
+</html>
