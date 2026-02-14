@@ -6,16 +6,13 @@ const sounds = {
     grinder: new Audio('audio/grinder.mp3'),
     plaster: new Audio('audio/plaster.mp3'),
     boom: new Audio('audio/explosion.mp3'),
-    finalMusic: new Audio('audio/final_music.mp3') // Финальная музыка
+    finalMusic: new Audio('audio/final_music.mp3')
 };
 
-// Настройка финальной музыки
 sounds.finalMusic.loop = true;
 let finalMusicStarted = false; 
-
 let itemsThrown = 0;
 
-// Функция отрисовки Canvas "под картинку"
 function drawImageCover(ctx, img, canvas) {
     const canvasRatio = canvas.width / canvas.height;
     const imgRatio = img.width / img.height;
@@ -38,22 +35,37 @@ function drawImageCover(ctx, img, canvas) {
 
 // ЭТАП 1: УБОРКА МУСОРА
 document.querySelectorAll('.furniture').forEach(item => {
-    item.onmousedown = function(e) {
-        let shiftX = e.clientX - item.getBoundingClientRect().left;
-        let shiftY = e.clientY - item.getBoundingClientRect().top;
+    const startDrag = (e) => {
+        const clientX = e.type === 'touchstart' ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type === 'touchstart' ? e.touches[0].clientY : e.clientY;
+        
+        let shiftX = clientX - item.getBoundingClientRect().left;
+        let shiftY = clientY - item.getBoundingClientRect().top;
         const area = document.getElementById('area1');
-        function moveAt(pageX, pageY) {
+
+        const moveAt = (pageX, pageY) => {
             item.style.left = pageX - shiftX - area.offsetLeft + 'px';
             item.style.top = pageY - shiftY - area.offsetTop + 'px';
-        }
-        function onMouseMove(e) { moveAt(e.pageX, e.pageY); }
-        document.addEventListener('mousemove', onMouseMove);
-        item.onmouseup = function() {
-            document.removeEventListener('mousemove', onMouseMove);
+        };
+
+        const onMove = (e) => {
+            const moveX = e.type === 'touchmove' ? e.touches[0].pageX : e.pageX;
+            const moveY = e.type === 'touchmove' ? e.touches[0].pageY : e.pageY;
+            moveAt(moveX, moveY);
+        };
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove, {passive: false});
+
+        const onUp = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('touchmove', onMove);
+            
             let binElement = document.getElementById('trash-bin');
             if (!binElement) return;
             let bin = binElement.getBoundingClientRect();
             let itm = item.getBoundingClientRect();
+
             if (itm.right > bin.left && itm.left < bin.right && itm.bottom > bin.top) {
                 item.style.display = 'none';
                 sounds.trashVariations[itemsThrown % 4].play();
@@ -66,7 +78,13 @@ document.querySelectorAll('.furniture').forEach(item => {
                 } else { prepareExplosion(binElement); }
             }
         };
+
+        document.addEventListener('mouseup', onUp, {once: true});
+        document.addEventListener('touchend', onUp, {once: true});
     };
+
+    item.addEventListener('mousedown', startDrag);
+    item.addEventListener('touchstart', startDrag, {passive: false});
     item.ondragstart = () => false;
 });
 
@@ -82,35 +100,74 @@ function prepareExplosion(bin) {
     }, 600);
 }
 
-// ЭТАП 2: ШЛИФОВКА
-function initGrinderStage() {
-    const canvas = document.getElementById('canvas2');
-    const tool = document.getElementById('grinder-tool');
+// ОБЩАЯ ФУНКЦИЯ ДЛЯ КАНВАСА (ДЛЯ ВСЕХ ЭТАПОВ)
+function handleCanvasAction(canvasId, toolId, btnId, isPlaster) {
+    const canvas = document.getElementById(canvasId);
+    const tool = document.getElementById(toolId);
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
+    canvas.width = canvas.parentElement.offsetWidth;
+    canvas.height = canvas.parentElement.offsetHeight;
+
     const img = new Image();
-    img.src = 'img/photo2.jpg'; 
+    img.src = canvasId === 'canvas3' ? 'img/dirty_wall.jpg' : (canvasId === 'canvas4' ? 'img/milk.jpg' : 'img/photo2.jpg');
     img.onload = () => drawImageCover(ctx, img, canvas);
-    canvas.parentElement.onmousemove = function(e) {
+
+    const performAction = (e) => {
         const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-        tool.style.display = 'block'; tool.style.left = x + 'px'; tool.style.top = y + 'px';
-        if (e.buttons === 1) {
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath(); ctx.arc(x, y, 60, 0, Math.PI * 2); ctx.fill();
-            if (sounds.grinder.paused) sounds.grinder.play();
-            checkProgress(ctx, canvas, 'btn2', false, 0.95);
-        } else { sounds.grinder.pause(); }
+        const clientX = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
+        const clientY = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
+        const x = clientX - rect.left;
+        const y = clientY - rect.top;
+
+        if (tool) {
+            tool.style.display = 'block';
+            tool.style.left = x + 'px';
+            tool.style.top = y + 'px';
+        }
+
+        if (e.buttons === 1 || e.type === 'touchmove') {
+            if (canvasId === 'canvas4' && !finalMusicStarted) {
+                sounds.finalMusic.play();
+                finalMusicStarted = true;
+            }
+
+            if (isPlaster) {
+                ctx.globalCompositeOperation = 'source-over';
+                ctx.fillStyle = '#f2f2f2';
+                ctx.beginPath(); ctx.rect(x - 60, y - 30, 120, 60); ctx.fill();
+                if (Math.random() > 0.7) createPlasterDrop(x, y, canvas.parentElement);
+                if (sounds.plaster.paused) sounds.plaster.play();
+            } else {
+                ctx.globalCompositeOperation = 'destination-out';
+                ctx.beginPath(); ctx.arc(x, y, 60, 0, Math.PI * 2); ctx.fill();
+                if (canvasId === 'canvas2' && sounds.grinder.paused) sounds.grinder.play();
+                if (canvasId === 'canvas4' && Math.random() > 0.8) createHeart(clientX, clientY);
+            }
+            checkProgress(ctx, canvas, btnId, isPlaster, 0.92);
+        }
     };
+
+    const stopSounds = () => {
+        sounds.grinder.pause();
+        sounds.plaster.pause();
+    };
+
+    canvas.parentElement.addEventListener('mousemove', performAction);
+    canvas.parentElement.addEventListener('touchmove', performAction, {passive: false});
+    window.addEventListener('mouseup', stopSounds);
+    window.addEventListener('touchend', stopSounds);
 }
 
-// ФУНКЦИЯ ДЛЯ СЕРЫХ КАПЕЛЬ (ЭТАП 3)
+function initGrinderStage() { handleCanvasAction('canvas2', 'grinder-tool', 'btn2', false); }
+function initSpatulaStage() { handleCanvasAction('canvas3', 'spatula-tool', 'btn3', true); }
+function initMilkStage() { handleCanvasAction('canvas4', null, 'btn4', false); }
+
 function createPlasterDrop(x, y, container) {
     const drop = document.createElement('div');
     drop.className = 'plaster-drop';
     drop.style.left = x + 'px'; drop.style.top = y + 'px';
-    const size = Math.random() * 8 + 4;
-    drop.style.width = size + 'px'; drop.style.height = size + 'px';
+    drop.style.width = '8px'; drop.style.height = '8px';
+    drop.style.backgroundColor = '#f2f2f2';
     container.appendChild(drop);
     setTimeout(() => {
         drop.style.transition = "all 0.6s ease-in";
@@ -120,59 +177,6 @@ function createPlasterDrop(x, y, container) {
     setTimeout(() => drop.remove(), 700);
 }
 
-// ЭТАП 3: ШТУКАТУРКА
-function initSpatulaStage() {
-    const canvas = document.getElementById('canvas3');
-    const tool = document.getElementById('spatula-tool');
-    const container = document.getElementById('area3');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
-    const img = new Image();
-    img.src = 'img/dirty_wall.jpg'; 
-    img.onload = () => drawImageCover(ctx, img, canvas);
-    canvas.parentElement.onmousemove = function(e) {
-        const rect = canvas.getBoundingClientRect();
-        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-        tool.style.display = 'block'; tool.style.left = x + 'px'; tool.style.top = y + 'px';
-        if (e.buttons === 1) {
-            ctx.globalCompositeOperation = 'source-over';
-            ctx.fillStyle = '#f2f2f2';
-            ctx.beginPath(); ctx.rect(x - 60, y - 30, 120, 60); ctx.fill();
-            if (Math.random() > 0.7) createPlasterDrop(x, y, container);
-            if (sounds.plaster.paused) sounds.plaster.play();
-            checkProgress(ctx, canvas, 'btn3', true, 0.95);
-        } else { sounds.plaster.pause(); }
-    };
-}
-
-// ЭТАП 4: МОЛОКО + ФИНАЛЬНАЯ МУЗЫКА
-function initMilkStage() {
-    const canvas = document.getElementById('canvas4');
-    const ctx = canvas.getContext('2d', { willReadFrequently: true });
-    canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
-    const imgMilk = new Image();
-    imgMilk.src = 'img/milk.jpg'; 
-    imgMilk.onload = () => drawImageCover(ctx, imgMilk, canvas);
-    
-    canvas.parentElement.onmousemove = function(e) {
-        if (e.buttons === 1) {
-            // ЗАПУСК МУЗЫКИ ПРИ ПЕРВОМ ДВИЖЕНИИ
-            if (!finalMusicStarted) {
-                sounds.finalMusic.play();
-                finalMusicStarted = true;
-            }
-
-            const rect = canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left; const y = e.clientY - rect.top;
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.beginPath(); ctx.arc(x, y, 40, 0, Math.PI * 2); ctx.fill();
-            if (Math.random() > 0.8) createHeart(e.clientX, e.clientY);
-            checkProgress(ctx, canvas, 'btn4', false, 0.90);
-        }
-    };
-}
-
-// ЧАСТИЦЫ СЕРДЕЦ ПРИ ВЫТИРАНИИ
 function createHeart(x, y) {
     const heart = document.createElement('div');
     heart.className = 'heart-particle';
@@ -184,7 +188,6 @@ function createHeart(x, y) {
     setTimeout(() => heart.remove(), 1500);
 }
 
-// ЭФФЕКТ ВЗРЫВА/ИСКР
 function launchFinishEffect(container, type) {
     for (let i = 0; i < 100; i++) {
         const p = document.createElement('div');
@@ -197,7 +200,6 @@ function launchFinishEffect(container, type) {
     }
 }
 
-// ПРОВЕРКА ПРОГРЕССА ОЧИСТКИ
 function checkProgress(ctx, canvas, btnId, isAdding, threshold) {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let count = 0; const step = 800;
@@ -209,8 +211,15 @@ function checkProgress(ctx, canvas, btnId, isAdding, threshold) {
         if (btn.style.display !== 'inline-block') {
             btn.style.display = 'inline-block';
             canvas.style.opacity = "0";
-            if (btnId === 'btn2') document.getElementById('hist5').classList.add('show');
-            if (btnId === 'btn3') document.getElementById('hist6').classList.add('show');
+            
+            // ИСПРАВЛЕНО: Показываем фото только после прохождения этапа
+            let hiddenPhotoId = btnId === 'btn2' ? 'hist5' : (btnId === 'btn3' ? 'hist6' : null);
+            if(hiddenPhotoId) {
+                const photo = document.getElementById(hiddenPhotoId);
+                photo.style.display = 'block';
+                setTimeout(() => photo.classList.add('show'), 50);
+            }
+
             if (btnId === 'btn4') {
                 document.getElementById('kiss-text').style.display = 'block';
                 document.getElementById('milk-text').innerHTML = "Так-то лучше!";
@@ -219,7 +228,6 @@ function checkProgress(ctx, canvas, btnId, isAdding, threshold) {
     }
 }
 
-// ПЕРЕКЛЮЧЕНИЕ ЭТАПОВ
 function nextStage(n) {
     document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('active'));
     document.getElementById('stage' + n).classList.add('active');
@@ -228,15 +236,13 @@ function nextStage(n) {
     if (n === 4) initMilkStage();
 }
 
-// ФИНАЛЬНЫЙ ЭКРАН
 function showFinal() {
     document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('active'));
     document.getElementById('final').classList.add('active');
-    heartWaterfall(); // Запуск бесконечной лавины
+    heartWaterfall();
     setTimeout(() => { document.getElementById('wish-modal').style.display = 'flex'; }, 2000);
 }
 
-// БЕСКОНЕЧНАЯ ЛАВИНА СЕРДЕЦ
 function heartWaterfall() {
     const hearts = ['❤️','💖','💝','💕','💘','😍','✨'];
     setInterval(() => {
