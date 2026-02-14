@@ -1,142 +1,254 @@
 const sounds = {
-    trash: [new Audio('audio/trash1.mp3'), new Audio('audio/trash2.mp3'), new Audio('audio/trash3.mp3'), new Audio('audio/trash4.mp3')],
+    trashVariations: [
+        new Audio('audio/trash1.mp3'), new Audio('audio/trash2.mp3'),
+        new Audio('audio/trash3.mp3'), new Audio('audio/trash4.mp3')
+    ],
     grinder: new Audio('audio/grinder.mp3'),
     plaster: new Audio('audio/plaster.mp3'),
     boom: new Audio('audio/explosion.mp3'),
-    finalMusic: new Audio('audio/final_music.mp3')
+    finalMusic: new Audio('audio/final_music.mp3') // Финальная музыка
 };
+
+// Настройка финальной музыки
 sounds.finalMusic.loop = true;
-let musicStarted = false;
+let finalMusicStarted = false; 
+
 let itemsThrown = 0;
 
-// Вспомогательная функция для координат
-function getCoords(e, container) {
-    const rect = container.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-    return { x, y };
+// Функция отрисовки Canvas "под картинку"
+function drawImageCover(ctx, img, canvas) {
+    const canvasRatio = canvas.width / canvas.height;
+    const imgRatio = img.width / img.height;
+    let drawWidth, drawHeight, offsetX, offsetY;
+
+    if (imgRatio > canvasRatio) {
+        drawHeight = canvas.height;
+        drawWidth = canvas.height * imgRatio;
+        offsetX = (canvas.width - drawWidth) / 2;
+        offsetY = 0;
+    } else {
+        drawWidth = canvas.width;
+        drawHeight = canvas.width / imgRatio;
+        offsetX = 0;
+        offsetY = (canvas.height - drawHeight) / 2;
+    }
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 }
 
-// ЭТАП 1: МУСОР (Touch + Mouse)
+// ЭТАП 1: УБОРКА МУСОРА
 document.querySelectorAll('.furniture').forEach(item => {
-    const start = (e) => {
-        e.preventDefault();
+    item.onmousedown = function(e) {
+        let shiftX = e.clientX - item.getBoundingClientRect().left;
+        let shiftY = e.clientY - item.getBoundingClientRect().top;
         const area = document.getElementById('area1');
-        const move = (me) => {
-            const p = getCoords(me, area);
-            item.style.left = (p.x - item.offsetWidth/2) + 'px';
-            item.style.top = (p.y - item.offsetHeight/2) + 'px';
-        };
-        const end = () => {
-            document.removeEventListener('mousemove', move);
-            document.removeEventListener('touchmove', move);
-            const bin = document.getElementById('trash-bin').getBoundingClientRect();
-            const itm = item.getBoundingClientRect();
+        function moveAt(pageX, pageY) {
+            item.style.left = pageX - shiftX - area.offsetLeft + 'px';
+            item.style.top = pageY - shiftY - area.offsetTop + 'px';
+        }
+        function onMouseMove(e) { moveAt(e.pageX, e.pageY); }
+        document.addEventListener('mousemove', onMouseMove);
+        item.onmouseup = function() {
+            document.removeEventListener('mousemove', onMouseMove);
+            let binElement = document.getElementById('trash-bin');
+            if (!binElement) return;
+            let bin = binElement.getBoundingClientRect();
+            let itm = item.getBoundingClientRect();
             if (itm.right > bin.left && itm.left < bin.right && itm.bottom > bin.top) {
                 item.style.display = 'none';
-                sounds.trash[itemsThrown % 4].play();
+                sounds.trashVariations[itemsThrown % 4].play();
                 itemsThrown++;
                 if (itemsThrown < 4) {
-                    document.getElementById('hist' + itemsThrown).style.opacity = 1;
-                } else {
-                    document.getElementById('trash-bin').classList.add('growing');
-                    setTimeout(() => {
-                        sounds.boom.play();
-                        document.getElementById('hist4').style.opacity = 1;
-                        document.getElementById('trash-bin').style.display = 'none';
-                        document.getElementById('btn1').style.display = 'inline-block';
-                    }, 600);
-                }
+                    const photo = document.getElementById('hist' + itemsThrown);
+                    if(photo) photo.style.opacity = 1;
+                    binElement.classList.add('shake');
+                    setTimeout(() => binElement.classList.remove('shake'), 200);
+                } else { prepareExplosion(binElement); }
             }
         };
-        document.addEventListener('mousemove', move);
-        document.addEventListener('touchmove', move, {passive: false});
-        document.addEventListener('mouseup', end, {once: true});
-        document.addEventListener('touchend', end, {once: true});
     };
-    item.addEventListener('mousedown', start);
-    item.addEventListener('touchstart', start, {passive: false});
+    item.ondragstart = () => false;
 });
 
-// ОБЩАЯ ФУНКЦИЯ ДЛЯ КАНВАСА (Исправлено мелькание фото)
-function initStage(canvasId, toolId, btnId, type) {
-    const canvas = document.getElementById(canvasId);
-    const ctx = canvas.getContext('2d');
-    const tool = document.getElementById(toolId);
-    canvas.width = canvas.offsetWidth;
-    canvas.height = canvas.offsetHeight;
-
-    const img = new Image();
-    img.src = (type === 'plaster') ? 'img/dirty_wall.jpg' : (canvasId === 'canvas4' ? 'img/milk.jpg' : 'img/photo2.jpg');
-    img.onload = () => ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-    const handle = (e) => {
-        e.preventDefault();
-        const p = getCoords(e, canvas);
-        if (tool) { tool.style.display = 'block'; tool.style.left = p.x + 'px'; tool.style.top = p.y + 'px'; }
-
-        if (e.buttons === 1 || e.touches) {
-            if (canvasId === 'canvas4' && !musicStarted) { sounds.finalMusic.play(); musicStarted = true; }
-            ctx.globalCompositeOperation = (type === 'plaster') ? 'source-over' : 'destination-out';
-            if (type === 'plaster') {
-                ctx.fillStyle = '#f2f2f2'; ctx.fillRect(p.x - 30, p.y - 15, 60, 30);
-                if (sounds.plaster.paused) sounds.plaster.play();
-            } else {
-                ctx.beginPath(); ctx.arc(p.x, p.y, 35, 0, Math.PI*2); ctx.fill();
-                if (canvasId === 'canvas2' && sounds.grinder.paused) sounds.grinder.play();
-            }
-            check(ctx, canvas, btnId, type === 'plaster');
-        } else {
-            sounds.grinder.pause(); sounds.plaster.pause();
-        }
-    };
-
-    canvas.addEventListener('mousemove', handle);
-    canvas.addEventListener('touchmove', handle, {passive: false});
-    canvas.addEventListener('mousedown', handle);
-    canvas.addEventListener('touchstart', handle, {passive: false});
+function prepareExplosion(bin) {
+    bin.classList.add('growing'); 
+    setTimeout(() => {
+        sounds.boom.play();
+        launchFinishEffect(document.getElementById('area1'), 'sparkles');
+        const photo4 = document.getElementById('hist4');
+        if(photo4) { photo4.style.opacity = "1"; photo4.style.zIndex = "10"; }
+        document.getElementById('btn1').style.display = 'inline-block';
+        bin.style.display = 'none';
+    }, 600);
 }
 
-function check(ctx, canvas, btnId, isPlaster) {
-    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
-    let hits = 0;
-    for (let i = 3; i < data.length; i += 400) {
-        if (isPlaster ? data[i-3] > 200 : data[i] === 0) hits++;
+// ЭТАП 2: ШЛИФОВКА
+function initGrinderStage() {
+    const canvas = document.getElementById('canvas2');
+    const tool = document.getElementById('grinder-tool');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
+    const img = new Image();
+    img.src = 'img/photo2.jpg'; 
+    img.onload = () => drawImageCover(ctx, img, canvas);
+    canvas.parentElement.onmousemove = function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+        tool.style.display = 'block'; tool.style.left = x + 'px'; tool.style.top = y + 'px';
+        if (e.buttons === 1) {
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath(); ctx.arc(x, y, 60, 0, Math.PI * 2); ctx.fill();
+            if (sounds.grinder.paused) sounds.grinder.play();
+            checkProgress(ctx, canvas, 'btn2', false, 0.95);
+        } else { sounds.grinder.pause(); }
+    };
+}
+
+// ФУНКЦИЯ ДЛЯ СЕРЫХ КАПЕЛЬ (ЭТАП 3)
+function createPlasterDrop(x, y, container) {
+    const drop = document.createElement('div');
+    drop.className = 'plaster-drop';
+    drop.style.left = x + 'px'; drop.style.top = y + 'px';
+    const size = Math.random() * 8 + 4;
+    drop.style.width = size + 'px'; drop.style.height = size + 'px';
+    container.appendChild(drop);
+    setTimeout(() => {
+        drop.style.transition = "all 0.6s ease-in";
+        drop.style.transform = "translateY(80px)";
+        drop.style.opacity = "0";
+    }, 10);
+    setTimeout(() => drop.remove(), 700);
+}
+
+// ЭТАП 3: ШТУКАТУРКА
+function initSpatulaStage() {
+    const canvas = document.getElementById('canvas3');
+    const tool = document.getElementById('spatula-tool');
+    const container = document.getElementById('area3');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
+    const img = new Image();
+    img.src = 'img/dirty_wall.jpg'; 
+    img.onload = () => drawImageCover(ctx, img, canvas);
+    canvas.parentElement.onmousemove = function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+        tool.style.display = 'block'; tool.style.left = x + 'px'; tool.style.top = y + 'px';
+        if (e.buttons === 1) {
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.fillStyle = '#f2f2f2';
+            ctx.beginPath(); ctx.rect(x - 60, y - 30, 120, 60); ctx.fill();
+            if (Math.random() > 0.7) createPlasterDrop(x, y, container);
+            if (sounds.plaster.paused) sounds.plaster.play();
+            checkProgress(ctx, canvas, 'btn3', true, 0.95);
+        } else { sounds.plaster.pause(); }
+    };
+}
+
+// ЭТАП 4: МОЛОКО + ФИНАЛЬНАЯ МУЗЫКА
+function initMilkStage() {
+    const canvas = document.getElementById('canvas4');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    canvas.width = canvas.parentElement.offsetWidth; canvas.height = canvas.parentElement.offsetHeight;
+    const imgMilk = new Image();
+    imgMilk.src = 'img/milk.jpg'; 
+    imgMilk.onload = () => drawImageCover(ctx, imgMilk, canvas);
+    
+    canvas.parentElement.onmousemove = function(e) {
+        if (e.buttons === 1) {
+            // ЗАПУСК МУЗЫКИ ПРИ ПЕРВОМ ДВИЖЕНИИ
+            if (!finalMusicStarted) {
+                sounds.finalMusic.play();
+                finalMusicStarted = true;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = e.clientX - rect.left; const y = e.clientY - rect.top;
+            ctx.globalCompositeOperation = 'destination-out';
+            ctx.beginPath(); ctx.arc(x, y, 40, 0, Math.PI * 2); ctx.fill();
+            if (Math.random() > 0.8) createHeart(e.clientX, e.clientY);
+            checkProgress(ctx, canvas, 'btn4', false, 0.90);
+        }
+    };
+}
+
+// ЧАСТИЦЫ СЕРДЕЦ ПРИ ВЫТИРАНИИ
+function createHeart(x, y) {
+    const heart = document.createElement('div');
+    heart.className = 'heart-particle';
+    heart.innerHTML = '❤️';
+    heart.style.left = x + 'px'; heart.style.top = y + 'px';
+    heart.style.setProperty('--x', (Math.random() - 0.5) * 200 + 'px');
+    heart.style.setProperty('--y', (Math.random() - 0.5) * 200 + 'px');
+    document.body.appendChild(heart);
+    setTimeout(() => heart.remove(), 1500);
+}
+
+// ЭФФЕКТ ВЗРЫВА/ИСКР
+function launchFinishEffect(container, type) {
+    for (let i = 0; i < 100; i++) {
+        const p = document.createElement('div');
+        p.className = 'finish-spark';
+        p.style.left = '50%'; p.style.top = '50%';
+        p.style.setProperty('--x', (Math.random() - 0.5) * 600 + 'px');
+        p.style.setProperty('--y', (Math.random() - 0.5) * 600 + 'px');
+        container.appendChild(p);
+        setTimeout(() => p.remove(), 2000);
     }
-    if (hits > (data.length/400) * 0.85) {
+}
+
+// ПРОВЕРКА ПРОГРЕССА ОЧИСТКИ
+function checkProgress(ctx, canvas, btnId, isAdding, threshold) {
+    const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let count = 0; const step = 800;
+    for(let i = 3; i < data.length; i += step) { 
+        if (isAdding) { if (data[i-3] > 240) count++; } else { if (data[i] === 0) count++; }
+    }
+    if (count > (data.length / step) * threshold) {
         const btn = document.getElementById(btnId);
         if (btn.style.display !== 'inline-block') {
             btn.style.display = 'inline-block';
-            canvas.style.opacity = 0;
-            // Показ скрытых фото только ТУТ
-            const photo = (btnId === 'btn2') ? document.getElementById('hist5') : (btnId === 'btn3' ? document.getElementById('hist6') : null);
-            if (photo) { photo.style.display = 'block'; setTimeout(() => photo.classList.add('show'), 10); }
-            if (btnId === 'btn4') document.getElementById('kiss-text').style.display = 'block';
+            canvas.style.opacity = "0";
+            if (btnId === 'btn2') document.getElementById('hist5').classList.add('show');
+            if (btnId === 'btn3') document.getElementById('hist6').classList.add('show');
+            if (btnId === 'btn4') {
+                document.getElementById('kiss-text').style.display = 'block';
+                document.getElementById('milk-text').innerHTML = "Так-то лучше!";
+            }
         }
     }
 }
 
+// ПЕРЕКЛЮЧЕНИЕ ЭТАПОВ
 function nextStage(n) {
     document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('active'));
     document.getElementById('stage' + n).classList.add('active');
-    if (n === 2) initStage('canvas2', 'grinder-tool', 'btn2', 'grind');
-    if (n === 3) initStage('canvas3', 'spatula-tool', 'btn3', 'plaster');
-    if (n === 4) initStage('canvas4', '', 'btn4', 'milk');
+    if (n === 2) initGrinderStage();
+    if (n === 3) initSpatulaStage();
+    if (n === 4) initMilkStage();
 }
 
+// ФИНАЛЬНЫЙ ЭКРАН
 function showFinal() {
     document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('active'));
     document.getElementById('final').classList.add('active');
+    heartWaterfall(); // Запуск бесконечной лавины
+    setTimeout(() => { document.getElementById('wish-modal').style.display = 'flex'; }, 2000);
+}
+
+// БЕСКОНЕЧНАЯ ЛАВИНА СЕРДЕЦ
+function heartWaterfall() {
+    const hearts = ['❤️','💖','💝','💕','💘','😍','✨'];
     setInterval(() => {
         const h = document.createElement('div');
-        h.className = 'waterfall-heart'; h.innerHTML = '❤️';
+        h.className = 'waterfall-heart';
+        h.innerHTML = hearts[Math.floor(Math.random() * hearts.length)];
         h.style.left = Math.random() * 100 + 'vw';
-        h.style.fontSize = Math.random() * 20 + 20 + 'px';
-        h.style.animationDuration = Math.random() * 2 + 2 + 's';
+        h.style.fontSize = (Math.random() * 25 + 25) + 'px';
+        h.style.animationDuration = (Math.random() * 1.5 + 2) + 's';
         document.body.appendChild(h);
-        setTimeout(() => h.remove(), 3000);
-    }, 100);
-    setTimeout(() => { document.getElementById('wish-modal').style.display = 'flex'; }, 2000);
+        setTimeout(() => h.remove(), 4000);
+    }, 80); 
 }
 
 function closeModal() { document.getElementById('wish-modal').style.display = 'none'; }
