@@ -100,7 +100,7 @@ function prepareExplosion(bin) {
     }, 600);
 }
 
-// ОБЩАЯ ФУНКЦИЯ ДЛЯ КАНВАСА (ДЛЯ ВСЕХ ЭТАПОВ)
+// ОБЩАЯ ФУНКЦИЯ ДЛЯ КАНВАСА
 function handleCanvasAction(canvasId, toolId, btnId, isPlaster) {
     const canvas = document.getElementById(canvasId);
     const tool = document.getElementById(toolId);
@@ -140,7 +140,15 @@ function handleCanvasAction(canvasId, toolId, btnId, isPlaster) {
             } else {
                 ctx.globalCompositeOperation = 'destination-out';
                 ctx.beginPath(); ctx.arc(x, y, 60, 0, Math.PI * 2); ctx.fill();
-                if (canvasId === 'canvas2' && sounds.grinder.paused) sounds.grinder.play();
+                
+                // ЭФФЕКТ ИСКР ДЛЯ БОЛГАРКИ
+                if (canvasId === 'canvas2') {
+                    if (sounds.grinder.paused) sounds.grinder.play();
+                    for(let i = 0; i < 2; i++) { // Генерируем по 2 искры за шаг движения
+                        createSpark(x, y, canvas.parentElement);
+                    }
+                }
+                
                 if (canvasId === 'canvas4' && Math.random() > 0.8) createHeart(clientX, clientY);
             }
             checkProgress(ctx, canvas, btnId, isPlaster, 0.92);
@@ -161,6 +169,19 @@ function handleCanvasAction(canvasId, toolId, btnId, isPlaster) {
 function initGrinderStage() { handleCanvasAction('canvas2', 'grinder-tool', 'btn2', false); }
 function initSpatulaStage() { handleCanvasAction('canvas3', 'spatula-tool', 'btn3', true); }
 function initMilkStage() { handleCanvasAction('canvas4', null, 'btn4', false); }
+
+// ФУНКЦИЯ СОЗДАНИЯ ИСКР
+function createSpark(x, y, container) {
+    const spark = document.createElement('div');
+    spark.className = 'finish-spark';
+    spark.style.left = x + 'px';
+    spark.style.top = y + 'px';
+    spark.style.background = '#ffdb4d'; // Яркий цвет искры
+    spark.style.setProperty('--x', (Math.random() - 0.5) * 120 + 'px');
+    spark.style.setProperty('--y', (Math.random() - 0.5) * 120 + 'px');
+    container.appendChild(spark);
+    setTimeout(() => spark.remove(), 800);
+}
 
 function createPlasterDrop(x, y, container) {
     const drop = document.createElement('div');
@@ -212,7 +233,6 @@ function checkProgress(ctx, canvas, btnId, isAdding, threshold) {
             btn.style.display = 'inline-block';
             canvas.style.opacity = "0";
             
-            // ИСПРАВЛЕНО: Показываем фото только после прохождения этапа
             let hiddenPhotoId = btnId === 'btn2' ? 'hist5' : (btnId === 'btn3' ? 'hist6' : null);
             if(hiddenPhotoId) {
                 const photo = document.getElementById(hiddenPhotoId);
