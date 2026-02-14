@@ -5,12 +5,17 @@ const sounds = {
     ],
     grinder: new Audio('audio/grinder.mp3'),
     plaster: new Audio('audio/plaster.mp3'),
-    boom: new Audio('audio/explosion.mp3')
+    boom: new Audio('audio/explosion.mp3'),
+    finalMusic: new Audio('audio/final_music.mp3') // Финальная музыка
 };
+
+// Настройка финальной музыки
+sounds.finalMusic.loop = true;
+let finalMusicStarted = false; 
 
 let itemsThrown = 0;
 
-// Функция отрисовки Canvas "под картинку" (аналог object-fit: cover)
+// Функция отрисовки Canvas "под картинку"
 function drawImageCover(ctx, img, canvas) {
     const canvasRatio = canvas.width / canvas.height;
     const imgRatio = img.width / img.height;
@@ -31,7 +36,7 @@ function drawImageCover(ctx, img, canvas) {
     ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
 }
 
-// ЭТАП 1
+// ЭТАП 1: УБОРКА МУСОРА
 document.querySelectorAll('.furniture').forEach(item => {
     item.onmousedown = function(e) {
         let shiftX = e.clientX - item.getBoundingClientRect().left;
@@ -77,7 +82,7 @@ function prepareExplosion(bin) {
     }, 600);
 }
 
-// ЭТАП 2
+// ЭТАП 2: ШЛИФОВКА
 function initGrinderStage() {
     const canvas = document.getElementById('canvas2');
     const tool = document.getElementById('grinder-tool');
@@ -115,7 +120,7 @@ function createPlasterDrop(x, y, container) {
     setTimeout(() => drop.remove(), 700);
 }
 
-// ЭТАП 3
+// ЭТАП 3: ШТУКАТУРКА
 function initSpatulaStage() {
     const canvas = document.getElementById('canvas3');
     const tool = document.getElementById('spatula-tool');
@@ -133,17 +138,14 @@ function initSpatulaStage() {
             ctx.globalCompositeOperation = 'source-over';
             ctx.fillStyle = '#f2f2f2';
             ctx.beginPath(); ctx.rect(x - 60, y - 30, 120, 60); ctx.fill();
-            
-            // ВОССТАНОВЛЕННЫЕ КАПЛИ
             if (Math.random() > 0.7) createPlasterDrop(x, y, container);
-            
             if (sounds.plaster.paused) sounds.plaster.play();
             checkProgress(ctx, canvas, 'btn3', true, 0.95);
         } else { sounds.plaster.pause(); }
     };
 }
 
-// ЭТАП 4: МОЛОКО
+// ЭТАП 4: МОЛОКО + ФИНАЛЬНАЯ МУЗЫКА
 function initMilkStage() {
     const canvas = document.getElementById('canvas4');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
@@ -151,8 +153,15 @@ function initMilkStage() {
     const imgMilk = new Image();
     imgMilk.src = 'img/milk.jpg'; 
     imgMilk.onload = () => drawImageCover(ctx, imgMilk, canvas);
+    
     canvas.parentElement.onmousemove = function(e) {
         if (e.buttons === 1) {
+            // ЗАПУСК МУЗЫКИ ПРИ ПЕРВОМ ДВИЖЕНИИ
+            if (!finalMusicStarted) {
+                sounds.finalMusic.play();
+                finalMusicStarted = true;
+            }
+
             const rect = canvas.getBoundingClientRect();
             const x = e.clientX - rect.left; const y = e.clientY - rect.top;
             ctx.globalCompositeOperation = 'destination-out';
@@ -163,6 +172,7 @@ function initMilkStage() {
     };
 }
 
+// ЧАСТИЦЫ СЕРДЕЦ ПРИ ВЫТИРАНИИ
 function createHeart(x, y) {
     const heart = document.createElement('div');
     heart.className = 'heart-particle';
@@ -174,6 +184,7 @@ function createHeart(x, y) {
     setTimeout(() => heart.remove(), 1500);
 }
 
+// ЭФФЕКТ ВЗРЫВА/ИСКР
 function launchFinishEffect(container, type) {
     for (let i = 0; i < 100; i++) {
         const p = document.createElement('div');
@@ -186,6 +197,7 @@ function launchFinishEffect(container, type) {
     }
 }
 
+// ПРОВЕРКА ПРОГРЕССА ОЧИСТКИ
 function checkProgress(ctx, canvas, btnId, isAdding, threshold) {
     const data = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
     let count = 0; const step = 800;
@@ -207,6 +219,7 @@ function checkProgress(ctx, canvas, btnId, isAdding, threshold) {
     }
 }
 
+// ПЕРЕКЛЮЧЕНИЕ ЭТАПОВ
 function nextStage(n) {
     document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('active'));
     document.getElementById('stage' + n).classList.add('active');
@@ -215,17 +228,17 @@ function nextStage(n) {
     if (n === 4) initMilkStage();
 }
 
+// ФИНАЛЬНЫЙ ЭКРАН
 function showFinal() {
     document.querySelectorAll('.stage-card').forEach(c => c.classList.remove('active'));
     document.getElementById('final').classList.add('active');
-    heartWaterfall();
+    heartWaterfall(); // Запуск бесконечной лавины
     setTimeout(() => { document.getElementById('wish-modal').style.display = 'flex'; }, 2000);
 }
 
-// БЕСКОНЕЧНАЯ ЛАВИНА СЕРДЕЦ (ОБНОВЛЕНО)
+// БЕСКОНЕЧНАЯ ЛАВИНА СЕРДЕЦ
 function heartWaterfall() {
     const hearts = ['❤️','💖','💝','💕','💘','😍','✨'];
-    // Используем setInterval для бесконечного потока
     setInterval(() => {
         const h = document.createElement('div');
         h.className = 'waterfall-heart';
@@ -234,10 +247,8 @@ function heartWaterfall() {
         h.style.fontSize = (Math.random() * 25 + 25) + 'px';
         h.style.animationDuration = (Math.random() * 1.5 + 2) + 's';
         document.body.appendChild(h);
-        
-        // Удаляем элемент после завершения анимации, чтобы не перегружать браузер
         setTimeout(() => h.remove(), 4000);
-    }, 80); // Сердца появляются каждые 80мс
+    }, 80); 
 }
 
 function closeModal() { document.getElementById('wish-modal').style.display = 'none'; }
